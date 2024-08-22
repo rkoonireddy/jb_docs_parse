@@ -1,0 +1,77 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Flex, Box } from '@chakra-ui/react';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import Dashboard from './pages/Dashboard';
+import ClientManagement from './pages/ClientManagement';
+import LegalTextManagement from './pages/LegalTextManagement';
+import DocumentGeneration from './pages/DocumentGeneration';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoutesWrapper from './components/ProtectedRoutesWrapper';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+const AppContent = () => {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return (
+    <Flex direction="column" h="100vh">
+      <Header /> {/* Header is included here */}
+      <Flex flex="1">
+        <Sidebar /> {/* Sidebar is included here */}
+        <Box flex="1" p={4} bg="gray.50">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoutesWrapper>
+                  <Dashboard />
+                </ProtectedRoutesWrapper>
+              }
+            />
+            <Route
+              path="/clients"
+              element={
+                <ProtectedRoutesWrapper>
+                  <ClientManagement />
+                </ProtectedRoutesWrapper>
+              }
+            />
+            <Route
+              path="/legal-texts"
+              element={
+                <ProtectedRoutesWrapper>
+                  <LegalTextManagement />
+                </ProtectedRoutesWrapper>
+              }
+            />
+            <Route
+              path="/document-generation"
+              element={
+                <ProtectedRoutesWrapper>
+                  <DocumentGeneration />
+                </ProtectedRoutesWrapper>
+              }
+            />
+          </Routes>
+        </Box>
+      </Flex>
+    </Flex>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;
