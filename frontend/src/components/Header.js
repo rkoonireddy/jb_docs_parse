@@ -24,6 +24,9 @@ const Header = () => {
           <ChakraLink as={Link} to="/" mr={4}>
             Dashboard
           </ChakraLink>
+          <ChakraLink as={Link} to="/contract-form" mr={4}>
+            Contract Generation
+          </ChakraLink>
           <ChakraLink as={Link} to="/clients" mr={4}>
             Clients
           </ChakraLink>
@@ -32,6 +35,9 @@ const Header = () => {
           </ChakraLink>
           <ChakraLink as={Link} to="/document-generation" mr={4}>
             Document Generation
+          </ChakraLink>
+          <ChakraLink as={Link} to="/upload-document" mr={4}>
+            Document Synthesis
           </ChakraLink>
           <Button colorScheme="red" onClick={handleLogout}>
             Logout

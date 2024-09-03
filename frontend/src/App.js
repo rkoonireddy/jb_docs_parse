@@ -10,6 +10,9 @@ import DocumentGeneration from './pages/DocumentGeneration';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoutesWrapper from './components/ProtectedRoutesWrapper';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ContractForm from './pages/ContractForm';
+import DocumentUploader from './components/DocumentUploader';
+
 
 const AppContent = () => {
   const { isAuthenticated } = useAuth();
@@ -50,10 +53,26 @@ const AppContent = () => {
               }
             />
             <Route
+              path="/upload-document"
+              element={
+                <ProtectedRoutesWrapper>
+                  <DocumentUploader />
+                </ProtectedRoutesWrapper>
+              }
+            />
+            <Route
               path="/document-generation"
               element={
                 <ProtectedRoutesWrapper>
                   <DocumentGeneration />
+                </ProtectedRoutesWrapper>
+              }
+            />
+            <Route
+              path="/contract-form"
+              element={
+                <ProtectedRoutesWrapper>
+                  <ContractForm />
                 </ProtectedRoutesWrapper>
               }
             />

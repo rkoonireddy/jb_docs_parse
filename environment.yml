@@ -1,0 +1,17 @@
+name: bjb
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - fastapi
+  - uvicorn
+  - jinja2
+  - weasyprint
+  - sqlalchemy
+  - postgresql
+  - nodejs
+  - pip
+  - pip:
+    - requests
+    - pytest
