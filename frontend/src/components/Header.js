@@ -14,7 +14,7 @@ const Header = () => {
   };
 
   return (
-    <Box bg="blue.500" p={4} color="white">
+    <Box bg="blue.900" p={4} color="white">
       <Flex justify="space-between" align="center">
         <Flex align="center">
           <Image src={logo} alt="Company Logo" boxSize="50px" mr={4} />
