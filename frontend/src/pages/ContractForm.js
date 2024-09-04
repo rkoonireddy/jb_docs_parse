@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Button, Input, FormControl, FormLabel, VStack, Box, Select, Textarea } from '@chakra-ui/react';
+import React, { useState, useEffect } from 'react';
+import { Button, Input, FormControl, FormLabel, VStack, Box, Select, Textarea, Checkbox, Spinner } from '@chakra-ui/react';
 import axios from 'axios';
+import { fetchLegalTexts } from '../services/api'; // Ensure this function is correctly defined
 
 const ContractForm = () => {
     const [formData, setFormData] = useState({
@@ -12,11 +13,27 @@ const ContractForm = () => {
         country: '',
         language: 'English', // Default to English
         specialInput: '',
-        // add other fields as needed
+        selectedDocuments: [], // For selected document titles
     });
 
+    const [legalTexts, setLegalTexts] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGenerated, setIsGenerated] = useState(false);
+    const [loadingLegalTexts, setLoadingLegalTexts] = useState(true);
+
+    useEffect(() => {
+        const getLegalTexts = async () => {
+            try {
+                const response = await fetchLegalTexts();
+                setLegalTexts(response);
+            } catch (error) {
+                console.error("Failed to fetch legal texts", error);
+            } finally {
+                setLoadingLegalTexts(false);
+            }
+        };
+        getLegalTexts();
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -26,11 +43,28 @@ const ContractForm = () => {
         });
     };
 
+    const handleDocumentSelect = (documentTitle) => {
+        setFormData((prevData) => {
+            const { selectedDocuments } = prevData;
+            const newSelectedDocuments = selectedDocuments.includes(documentTitle)
+                ? selectedDocuments.filter(title => title !== documentTitle)
+                : [...selectedDocuments, documentTitle];
+
+            return {
+                ...prevData,
+                selectedDocuments: newSelectedDocuments,
+            };
+        });
+    };
+
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            const response = await axios.post('/api/generate-contract', formData, {
+            const response = await axios.post('http://localhost:8000/generate-contract', formData, {
                 responseType: 'blob', // Expect a binary response (PDF)
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
@@ -40,7 +74,7 @@ const ContractForm = () => {
             link.click();
             setIsGenerated(true);
         } catch (error) {
-            console.error('Error generating contract:', error);
+            console.error('Error generating contract:', error.response ? error.response.data : error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -84,6 +118,27 @@ const ContractForm = () => {
                 <FormControl id="specialInput" isRequired>
                     <FormLabel>Special Input</FormLabel>
                     <Textarea name="specialInput" value={formData.specialInput} onChange={handleChange} />
+                </FormControl>
+
+                {/* Legal Text Selection */}
+                <FormControl id="legalTexts" isRequired>
+                    <FormLabel>Select Legal Texts</FormLabel>
+                    {loadingLegalTexts ? (
+                        <Spinner />
+                    ) : (
+                        <VStack align="start">
+                            {legalTexts.map((text) => (
+                                <Checkbox
+                                    key={text.title} // Use document title as key
+                                    value={text.title} // Use title to manage state
+                                    isChecked={formData.selectedDocuments.includes(text.title)}
+                                    onChange={() => handleDocumentSelect(text.title)}
+                                >
+                                    {text.title} {/* Display document title */}
+                                </Checkbox>
+                            ))}
+                        </VStack>
+                    )}
                 </FormControl>
 
                 {/* Conditional fields based on contractType */}

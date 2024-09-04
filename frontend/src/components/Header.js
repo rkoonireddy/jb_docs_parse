@@ -33,9 +33,6 @@ const Header = () => {
           <ChakraLink as={Link} to="/legal-texts" mr={4}>
             Legal Texts
           </ChakraLink>
-          <ChakraLink as={Link} to="/document-generation" mr={4}>
-            Document Generation
-          </ChakraLink>
           <ChakraLink as={Link} to="/upload-document" mr={4}>
             Document Synthesis
           </ChakraLink>

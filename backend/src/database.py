@@ -1,17 +1,16 @@
-db = {
-    "pdfs": {},  # Store PDFs with unique IDs
-    "clients": [
-        {"id": "1", "name": "Client A"},
-        {"id": "2", "name": "Client B"},
-        {"id": "3", "name": "Client C"}
-    ]  # Example clients
-}
+# src/database.py
+
+from typing import List, Dict
+
+# Dummy implementations for example purposes
+pdf_storage = {}
+client_list = []
 
 def add_pdf(pdf_id: str, pdf_content: bytes):
-    db["pdfs"][pdf_id] = pdf_content
+    pdf_storage[pdf_id] = pdf_content
 
-def get_pdf(pdf_id: str):
-    return db["pdfs"].get(pdf_id, None)
+def get_pdf(pdf_id: str) -> bytes:
+    return pdf_storage.get(pdf_id, None)
 
-def get_clients():
-    return db["clients"]
+def get_clients() -> List[Dict]:
+    return client_list

@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import ClientManagement from './pages/ClientManagement';
 import LegalTextManagement from './pages/LegalTextManagement';
-import DocumentGeneration from './pages/DocumentGeneration';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoutesWrapper from './components/ProtectedRoutesWrapper';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -57,14 +56,6 @@ const AppContent = () => {
               element={
                 <ProtectedRoutesWrapper>
                   <DocumentUploader />
-                </ProtectedRoutesWrapper>
-              }
-            />
-            <Route
-              path="/document-generation"
-              element={
-                <ProtectedRoutesWrapper>
-                  <DocumentGeneration />
                 </ProtectedRoutesWrapper>
               }
             />

@@ -1,52 +1,22 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from minio import Minio
-from minio.error import S3Error
-from .database import add_pdf, get_pdf, get_clients
-from .utils import extract_text_from_pdf
-import sys
-import os
-import io
-from dotenv import load_dotenv
-load_dotenv()
-
-
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-app = FastAPI()
-
-# Configure CORS
-orig_origins = [
-    "http://localhost:3000",  # Add your frontend origin here
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=orig_origins,  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allows all headers
-)
-
-
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from io import BytesIO
-import os
-import sys
+from src.models import ContractFormData, LegalText
+from src.pdf_utils import generate_contract_pdf, extract_text_from_pdf
+from src.minio_client import minio_client, check_bucket
+from src.database import add_pdf, get_pdf, get_clients
+from typing import List
+import uuid
+import io
+from dotenv import load_dotenv
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
 
 app = FastAPI()
 
 # Configure CORS
 orig_origins = [
-    "http://localhost:3000",  # Add your frontend origin here
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -57,24 +27,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ContractFormData(BaseModel):
-    contractType: str
-    name: str
-    address: str
-    amount: float = None
-    duration: int = None
-    country: str
-    language: str
-    specialInput: str
-    interestRate: float = None
-    monthlyRent: float = None
+from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from src.models import ContractFormData, LegalText
+from src.pdf_utils import generate_contract_pdf
+from src.minio_client import minio_client, check_bucket
+from src.database import add_pdf, get_pdf, get_clients
+from typing import List
+import uuid
+import io
+from dotenv import load_dotenv
+import aiofiles
+
+load_dotenv()
+
+app = FastAPI()
+
+# Configure CORS
+orig_origins = [
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=orig_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 @app.post("/generate-contract/")
 async def generate_contract(data: ContractFormData):
-    buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
-
     translations = {
         "English": {
             "contractType": "Contract Type",
@@ -88,118 +76,83 @@ async def generate_contract(data: ContractFormData):
             "interestRate": "Interest Rate (%)",
             "monthlyRent": "Monthly Rent",
         },
-        "French": {
-            "contractType": "Type de contrat",
-            "name": "Nom",
-            "address": "Adresse",
-            "country": "Pays",
-            "language": "Langue",
-            "specialInput": "Entrée spéciale",
-            "amount": "Montant",
-            "duration": "Durée (mois)",
-            "interestRate": "Taux d'intérêt (%)",
-            "monthlyRent": "Loyer mensuel",
-        },
-        "German": {
-            "contractType": "Vertragstyp",
-            "name": "Name",
-            "address": "Adresse",
-            "country": "Land",
-            "language": "Sprache",
-            "specialInput": "Besondere Eingabe",
-            "amount": "Betrag",
-            "duration": "Dauer (Monate)",
-            "interestRate": "Zinssatz (%)",
-            "monthlyRent": "Monatsmiete",
-        },
-        "Spanish": {
-            "contractType": "Tipo de contrato",
-            "name": "Nombre",
-            "address": "Dirección",
-            "country": "País",
-            "language": "Idioma",
-            "specialInput": "Entrada especial",
-            "amount": "Cantidad",
-            "duration": "Duración (meses)",
-            "interestRate": "Tasa de interés (%)",
-            "monthlyRent": "Renta mensual",
-        },
-        "Italian": {
-            "contractType": "Tipo di contratto",
-            "name": "Nome",
-            "address": "Indirizzo",
-            "country": "Paese",
-            "language": "Lingua",
-            "specialInput": "Input speciale",
-            "amount": "Importo",
-            "duration": "Durata (mesi)",
-            "interestRate": "Tasso d'interesse (%)",
-            "monthlyRent": "Affitto mensile",
-        }
+        # Add other languages here
     }
 
     translation = translations.get(data.language, translations["English"])
 
-    p.drawString(72, height - 100, f"{translation['contractType']}: {data.contractType}")
-    p.drawString(72, height - 120, f"{translation['name']}: {data.name}")
-    p.drawString(72, height - 140, f"{translation['address']}: {data.address}")
-    p.drawString(72, height - 160, f"{translation['country']}: {data.country}")
-    p.drawString(72, height - 180, f"{translation['language']}: {data.language}")
-    p.drawString(72, height - 200, f"{translation['specialInput']}: {data.specialInput}")
+    document_texts = []
+    for doc_id in data.selectedDocuments:
+        try:
+            key = f"{doc_id}.pdf"
+            logging.info(f"Fetching document: {key}")
+            response = minio_client.get_object("bjb", key)
+            pdf_content = response.read()
+            # logging.info({pdf_content})
+            text = extract_text_from_pdf(pdf_content)
+            logging.info({text})
+            document_texts.append(text)
+        except Exception as e:
+            logging.error(f"Error retrieving document {doc_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error retrieving document {doc_id}: {str(e)}")
 
-    if data.contractType == 'mortgage':
-        p.drawString(72, height - 220, f"{translation['amount']}: {data.amount}")
-        p.drawString(72, height - 240, f"{translation['duration']}: {data.duration} months")
-    elif data.contractType == 'loan':
-        p.drawString(72, height - 220, f"{translation['interestRate']}: {data.interestRate}%")
-    elif data.contractType == 'lease':
-        p.drawString(72, height - 220, f"{translation['monthlyRent']}: {data.monthlyRent}")
+    combined_text = " ".join(document_texts)
+    logging.info({combined_text})
 
-    p.showPage()
-    p.save()
+    contract_data = {
+        "contractType": data.contractType,
+        "name": data.name,
+        "address": data.address,
+        "amount": data.amount,
+        "duration": data.duration,
+        "country": data.country,
+        "language": data.language,
+        "specialInput": data.specialInput,
+        "interestRate": data.interestRate,
+        "monthlyRent": data.monthlyRent,
+        "combinedText": combined_text
+    }
+    
+    pdf_content = generate_contract_pdf(contract_data, translation)
 
-    buffer.seek(0)
+    buffer = io.BytesIO(pdf_content)
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=contract.pdf"})
-
-
-#change bucket name
-bucket_name = "bjb"
-minio_access_key = os.getenv('MINIO_ACCESS_KEY')
-minio_secret_key = os.getenv('MINIO_SECRET_KEY')
-
-# MinIO client
-minio_client = Minio(
-    "localhost:9000",  # MinIO server endpoint
-    access_key = minio_access_key,
-    secret_key= minio_secret_key,
-    secure=False  # Set to True if using HTTPS
-)
-
 
 @app.post("/upload-document/")
 async def upload_document(file: UploadFile = File(...)):
-    try:
-        # Check if the bucket exists, create it if it doesn't
-        if not minio_client.bucket_exists(bucket_name):
-            minio_client.make_bucket(bucket_name)
+    check_bucket()  # Ensure the bucket exists
 
-        # Read file data and convert it to a file-like object
-        file_data = await file.read()
-        file_data_stream = io.BytesIO(file_data)
-
-        # Upload file to MinIO
-        minio_client.put_object(bucket_name, file.filename, file_data_stream, len(file_data))
-        return {"message": "File uploaded successfully"}
-    except S3Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # Generate a unique ID for the document
+    unique_id = str(uuid.uuid4())
     
-@app.post("/upload-pdf/")
-async def upload_pdf(pdf_id: str, file: UploadFile = File(...)):
-    if get_pdf(pdf_id) is not None:
-        raise HTTPException(status_code=400, detail="PDF with this ID already exists.")
-    pdf_content = await file.read()
-    add_pdf(pdf_id, pdf_content)
-    return {"message": "PDF uploaded successfully", "pdf_id": pdf_id}
+    # Define the document ID based on the file name (you may need to sanitize the file name)
+    document_id = file.filename
+    
+    # Define metadata
+    metadata = {
+        "x-amz-meta-document-id": unique_id,
+        "x-amz-meta-filename": document_id,
+        "x-amz-meta-content-type": file.content_type,
+    }
+
+    # Read file data and convert it to a file-like object
+    file_data = await file.read()
+    file_data_stream = io.BytesIO(file_data)
+
+    # Upload file to MinIO using the document name as the object name and metadata with unique ID
+    try:
+        minio_client.put_object(
+            "bjb",
+            document_id, #this is the key
+            file_data_stream,
+            len(file_data),
+            content_type=file.content_type,
+            metadata=metadata
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"message": "File uploaded successfully", "document_id": unique_id}
 
 @app.get("/retrieve-pdf/{pdf_id}")
 async def retrieve_pdf(pdf_id: str):
@@ -214,6 +167,27 @@ async def list_clients():
     clients = get_clients()
     return {"data": clients}
 
+@app.get("/legal-texts", response_model=List[LegalText])
+async def get_legal_texts():
+    try:
+        objects = minio_client.list_objects("bjb")
+        legal_texts = []
+        for idx, obj in enumerate(objects):
+            title = obj.object_name.split('/')[-1].split('.')[0]
+            url = f"http://localhost:9000/bjb/{obj.object_name}"
+            icon_url = url + "-icon.png"
+
+            legal_texts.append({
+                "id": idx,
+                "title": title,
+                "url": url,
+                "iconUrl": icon_url
+            })
+
+        return legal_texts
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the PDF Processing API"}
+    return {"message": "Welcome to the BJB Contract Generation backend."}
